@@ -119,62 +119,64 @@ function Disable-LANDesk
     $ServiceNames | % `
     {
         $name = $_
-        $service = Get-Service -Name $name
+		$service = Get-Service -Name $name -ErrorAction:SilentlyContinue
+		if ($service)
+		{
+			Write-Host
+			Write-Host "Checking service `"$name`"" -ForegroundColor Yellow
 
-        Write-Host
-        Write-Host "Checking service `"$name`"" -ForegroundColor Yellow
+			# Disable the service
 
-        # Disable the service
+			if ($service.StartType -ne 'Disabled')
+			{
+				Write-Work "sc config `"$name`" start= disabled"
+				cmd /c sc config  "$name" start= disabled
+				$changes++
+			}
+			else
+			{
+				Write-OK 'Service already set to Disabled'
+			}
 
-        if ($service.StartType -ne 'Disabled')
-        {
-            Write-Work "sc config `"$name`" start= disabled"
-            cmd /c sc config  "$name" start= disabled
-            $changes++
-        }
-        else
-        {
-            Write-OK 'Service already set to Disabled'
-        }
+			# Set the failure action to "Take No Action" to prevent a restart
 
-        # Set the failure action to "Take No Action" to prevent a restart
+			$nofail = $true
+			$failure = cmd /c sc qfailure "$name"
+			$failure | ? { $_ -like "*FAILURE_ACTIONS*" } | % `
+			{
+				Write-Work "sc failure `"$name`" reset= 0 actions= `"`""
+				cmd /c sc failure "$name" reset= 0 actions= `"`"
+				$nofail = $false
+				$changes++
+			}
 
-        $nofail = $true
-        $failure = cmd /c sc qfailure "$name"
-        $failure | ? { $_ -like "*FAILURE_ACTIONS*" } | % `
-        {
-            Write-Work "sc failure `"$name`" reset= 0 actions= `"`""
-            cmd /c sc failure "$name" reset= 0 actions= `"`"
-            $nofail = $false
-            $changes++
-        }
+			if ($nofail)
+			{
+				Write-OK 'Service fail mode already set to No Action'
+			}
 
-        if ($nofail)
-        {
-            Write-OK 'Service fail mode already set to No Action'
-        }
+			# Stop the service
 
-        # Stop the service
+			if ($service.Status -ne 'Stopped')
+			{
+				if ($service.CanStop)
+				{
+					Write-Work "sc stop `"$name`""
+					cmd /c sc stop "$name"
+				}
+				else
+				{
+					Write-Work "Killing `"$name`""
+					Get-Process -Name $name -ErrorAction Ignore | Stop-Process -Force
+				}
 
-        if ($service.Status -ne 'Stopped')
-        {
-            if ($service.CanStop)
-            {
-                Write-Work "sc stop `"$name`""
-                cmd /c sc stop "$name"
-            }
-            else
-            {
-                Write-Work "Killing `"$name`""
-                Get-Process -Name $name -ErrorAction Ignore | Stop-Process -Force
-            }
-
-            $changes++
-        }
-        else
-        {
-            Write-OK 'Service already Stopped'
-        }
+				$changes++
+			}
+			else
+			{
+				Write-OK 'Service already Stopped'
+			}
+		}
     }
 
     Write-Host
@@ -254,44 +256,46 @@ function Enable-LANDesk ()
     $ServiceNames | % `
     {
         $name = $_
-        $service = Get-Service -Name $name
+		$service = Get-Service -Name $name -ErrorAction:SilentlyContinue
+		if ($service)
+		{
+			Write-Host
+			Write-Host "Checking service `"$name`"" -ForegroundColor Yellow
 
-        Write-Host
-        Write-Host "Checking service `"$name`"" -ForegroundColor Yellow
+			# Enable the service
 
-        # Enable the service
+			if ($service.StartType -eq 'Disabled')
+			{
+				Write-Work "sc config `"$name`" start= auto"
+				cmd /c sc config  "$name" start= auto
+			}
+			else
+			{
+				Write-OK 'Service already set to Auto'
+			}
 
-        if ($service.StartType -eq 'Disabled')
-        {
-            Write-Work "sc config `"$name`" start= auto"
-            cmd /c sc config  "$name" start= auto
-        }
-        else
-        {
-            Write-OK 'Service already set to Auto'
-        }
+			# FAILURE_ACTIONS will be restored automatically by LANDesk agents
+			# so no need to change them here
 
-        # FAILURE_ACTIONS will be restored automatically by LANDesk agents
-        # so no need to change them here
+			# Start the service if we can so LANDesk Portal Manager can be used immediately
 
-        # Start the service if we can so LANDesk Portal Manager can be used immediately
-
-        if ($service.Status -eq 'Stopped')
-        {
-            if ($service.CanStart)
-            {
-                Write-Work "sc start `"$name`""
-                cmd /c sc start "$name"
-            }
-            else
-            {
-                Write-OK "Service `"$name`" will auto-start as needed"
-            }
-        }
-        else
-        {
-            Write-OK 'Service already started'
-        }
+			if ($service.Status -eq 'Stopped')
+			{
+				if ($service.CanStart)
+				{
+					Write-Work "sc start `"$name`""
+					cmd /c sc start "$name"
+				}
+				else
+				{
+					Write-OK "Service `"$name`" will auto-start as needed"
+				}
+			}
+			else
+			{
+				Write-OK 'Service already started'
+			}
+		}
     }
 
     # Do we really need to enable the Agent Health task?
@@ -387,15 +391,18 @@ function Show-LANDesk
     $ServiceNames | % `
     {
         $name = $_
-        $service = Get-Service -Name $name
-        if (($service.Status -ne 'Stopped') -or ($service.StartType -ne 'Disabled'))
-        {
-            Write-Work "$($service.DisplayName) ($($service.Name)) $($service.StartType)... $($service.Status)"
-        }
-        else
-        {
-            Write-OK "$($service.DisplayName) ($($service.Name)) $($service.StartType)... $($service.Status)"
-        }
+		$service = Get-Service -Name $name -ErrorAction:SilentlyContinue
+		if ($service)
+		{
+			if (($service.Status -ne 'Stopped') -or ($service.StartType -ne 'Disabled'))
+			{
+				Write-Work "$($service.DisplayName) ($($service.Name)) $($service.StartType)... $($service.Status)"
+			}
+			else
+			{
+				Write-OK "$($service.DisplayName) ($($service.Name)) $($service.StartType)... $($service.Status)"
+			}
+		}
     }
 
     # rogue processes

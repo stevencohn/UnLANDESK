@@ -5,10 +5,9 @@ Minimum requirement: PowerShell Windows Management Framework 5.0
 
 Open a PowerShell command window **as administrator**
 
-   1. PS> `Import-Module .\UnLANDESK.psm1 -force`
-   1. PS> `Disable-LANDesk`
-   1. PS> `Enable-LANDesk`
-   1. PS> `Show-LANDesk`
+   1. PS> `.\Disable-LANDesk.ps1`
+   1. PS> `.\Enable-LANDesk.ps1`
+   1. PS> `.\Show-LANDesk.ps1`
 
 The commands are re-entrant so you can run them over and over without a problem.
 

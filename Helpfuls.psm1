@@ -409,14 +409,21 @@ function ShowScheduledTask
 
 	Write-Host
 	Write-Host "Finding task $name" -ForegroundColor Yellow
-	$task = Get-ScheduledTask -TaskName $name
-	if ($task.State -ne 'Disabled')
+	$task = Get-ScheduledTask -TaskName $name -ErrorAction:SilentlyContinue
+	if ($task)
 	{
-		WriteWork "$($task.TaskName) is $($task.State)"
+		if ($task.State -ne 'Disabled')
+		{
+			WriteWork "$($task.TaskName) is $($task.State)"
+		}
+		else
+		{
+			WriteOK "$($task.TaskName) is $($task.State)"
+		}
 	}
 	else
 	{
-		WriteOK "$($task.TaskName) is $($task.State)"
+		Write-Host "    $name scheduled task not found" -ForegroundColor
 	}
 }
 
